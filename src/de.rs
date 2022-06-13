@@ -3,9 +3,9 @@
 //!
 
 use errors::Error as LibError;
-use errors::ErrorKind;
 use errors::Result as LibResult;
 use neon::prelude::*;
+use neon::types::buffer::TypedArray;
 use serde;
 use serde::de::Visitor;
 use serde::de::{DeserializeOwned, DeserializeSeed, EnumAccess, MapAccess, SeqAccess, Unexpected,
@@ -79,9 +79,9 @@ impl<'x, 'd, 'a, 'j, C: Context<'j>> serde::de::Deserializer<'x> for &'d mut Des
             let mut deserializer = JsObjectAccess::new(self.cx, val)?;
             visitor.visit_map(&mut deserializer)
         } else {
-            bail!(ErrorKind::NotImplemented(
+            Err(LibError::NotImplemented(
                 "unimplemented Deserializer::Deserializer",
-            ));
+            ))
         }
     }
 
@@ -112,18 +112,18 @@ impl<'x, 'd, 'a, 'j, C: Context<'j>> serde::de::Deserializer<'x> for &'d mut Des
             let prop_names = val.get_own_property_names(self.cx)?;
             let len = prop_names.len(self.cx);
             if len != 1 {
-                Err(ErrorKind::InvalidKeyType(format!(
+                Err(LibError::InvalidKeyType(format!(
                     "object key with {} properties",
                     len
                 )))?
             }
-            let key = prop_names.get(self.cx, 0)?.downcast::<JsString, C>(self.cx).or_throw(self.cx)?;
+            let key = prop_names.get::<JsValue, _, _>(self.cx, 0)?.downcast::<JsString, C>(self.cx).or_throw(self.cx)?;
             let enum_value = val.get(self.cx, key)?;
             let key_value = key.value(self.cx);
             visitor.visit_enum(JsEnumAccess::new(self.cx, key_value, Some(enum_value)))
         } else {
             let m = self.input.to_string(self.cx)?.value(self.cx);
-            Err(ErrorKind::InvalidKeyType(m))?
+            Err(LibError::InvalidKeyType(m))?
         }
     }
 
@@ -132,7 +132,7 @@ impl<'x, 'd, 'a, 'j, C: Context<'j>> serde::de::Deserializer<'x> for &'d mut Des
         V: Visitor<'x>,
     {
         let buff = self.input.downcast::<JsBuffer, C>(self.cx).or_throw(self.cx)?;
-        let copy = self.cx.borrow(&buff, |buff| Vec::from(buff.as_slice()));
+        let copy = Vec::from(buff.as_slice(self.cx));
         visitor.visit_bytes(&copy)
     }
 
@@ -141,7 +141,7 @@ impl<'x, 'd, 'a, 'j, C: Context<'j>> serde::de::Deserializer<'x> for &'d mut Des
         V: Visitor<'x>,
     {
         let buff = self.input.downcast::<JsBuffer, C>(self.cx).or_throw(self.cx)?;
-        let copy = self.cx.borrow(&buff, |buff| Vec::from(buff.as_slice()));
+        let copy = Vec::from(buff.as_slice(self.cx));
         visitor.visit_byte_buf(copy)
     }
 
@@ -247,9 +247,9 @@ impl<'x, 'a, 'j, C: Context<'j>> MapAccess<'x> for JsObjectAccess<'a, 'j, C> {
         V: DeserializeSeed<'x>,
     {
         if self.idx >= self.len {
-            return Err(ErrorKind::ArrayIndexOutOfBounds(self.len, self.idx))?;
+            return Err(LibError::ArrayIndexOutOfBounds(self.len, self.idx))?;
         }
-        let prop_name = self.prop_names.get(self.cx, self.idx)?;
+        let prop_name = self.prop_names.get::<JsString, _, _>(self.cx, self.idx)?;
         let value = self.input.get(self.cx, prop_name)?;
 
         self.idx += 1;
