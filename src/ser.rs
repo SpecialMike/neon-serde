@@ -39,36 +39,36 @@ where
 }
 
 #[doc(hidden)]
-pub struct Serializer<'a, 'j, C: 'a>
+pub struct Serializer<'a, 'j, C>
 where
-    C: Context<'j>,
+    C: Context<'j> + 'a,
 {
     cx: &'a mut C,
     ph: PhantomData<&'j ()>,
 }
 
 #[doc(hidden)]
-pub struct ArraySerializer<'a, 'j, C: 'a>
+pub struct ArraySerializer<'a, 'j, C>
 where
-    C: Context<'j>,
+    C: Context<'j> + 'a,
 {
     cx: &'a mut C,
     array: Handle<'j, JsArray>,
 }
 
 #[doc(hidden)]
-pub struct TupleVariantSerializer<'a, 'j, C: 'a>
+pub struct TupleVariantSerializer<'a, 'j, C>
 where
-    C: Context<'j>,
+    C: Context<'j> + 'a,
 {
     outter_object: Handle<'j, JsObject>,
     inner: ArraySerializer<'a, 'j, C>,
 }
 
 #[doc(hidden)]
-pub struct MapSerializer<'a, 'j, C: 'a>
+pub struct MapSerializer<'a, 'j, C>
 where
-    C: Context<'j>,
+    C: Context<'j> + 'a,
 {
     cx: &'a mut C,
     object: Handle<'j, JsObject>,
@@ -76,18 +76,18 @@ where
 }
 
 #[doc(hidden)]
-pub struct StructSerializer<'a, 'j, C: 'a>
+pub struct StructSerializer<'a, 'j, C>
 where
-    C: Context<'j>,
+    C: Context<'j> + 'a,
 {
     cx: &'a mut C,
     object: Handle<'j, JsObject>,
 }
 
 #[doc(hidden)]
-pub struct StructVariantSerializer<'a, 'j, C: 'a>
+pub struct StructVariantSerializer<'a, 'j, C>
 where
-    C: Context<'j>,
+    C: Context<'j> + 'a,
 {
     outer_object: Handle<'j, JsObject>,
     inner: StructSerializer<'a, 'j, C>,
@@ -203,9 +203,9 @@ where
     }
 
     #[inline]
-    fn serialize_some<T: ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error>
+    fn serialize_some<T>(self, value: &T) -> Result<Self::Ok, Self::Error>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         value.serialize(self)
     }
@@ -231,19 +231,19 @@ where
     }
 
     #[inline]
-    fn serialize_newtype_struct<T: ?Sized>(
+    fn serialize_newtype_struct<T>(
         self,
         _name: &'static str,
         value: &T,
     ) -> Result<Self::Ok, Self::Error>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         value.serialize(self)
     }
 
     #[inline]
-    fn serialize_newtype_variant<T: ?Sized>(
+    fn serialize_newtype_variant<T>(
         self,
         _name: &'static str,
         _variant_index: u32,
@@ -251,7 +251,7 @@ where
         value: &T,
     ) -> Result<Self::Ok, Self::Error>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         let obj = JsObject::new(&mut *self.cx);
         let value_js = to_value(self.cx, value)?;
@@ -336,9 +336,9 @@ where
     type Ok = Handle<'j, JsValue>;
     type Error = Error;
 
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+    fn serialize_element<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         let value = to_value(self.cx, value)?;
 
@@ -362,9 +362,9 @@ where
     type Error = Error;
 
     #[inline]
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+    fn serialize_element<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         ser::SerializeSeq::serialize_element(self, value)
     }
@@ -384,9 +384,9 @@ where
     type Error = Error;
 
     #[inline]
-    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+    fn serialize_field<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         ser::SerializeSeq::serialize_element(self, value)
     }
@@ -425,9 +425,9 @@ where
     type Error = Error;
 
     #[inline]
-    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+    fn serialize_field<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         use serde::ser::SerializeSeq;
         self.inner.serialize_element(value)
@@ -463,18 +463,18 @@ where
     type Ok = Handle<'j, JsValue>;
     type Error = Error;
 
-    fn serialize_key<T: ?Sized>(&mut self, key: &T) -> Result<(), Self::Error>
+    fn serialize_key<T>(&mut self, key: &T) -> Result<(), Self::Error>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         let key = to_value(self.cx, key)?;
         self.key_holder.set(self.cx, "key", key)?;
         Ok(())
     }
 
-    fn serialize_value<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+    fn serialize_value<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         let key: Handle<'j, JsValue> = self.key_holder.get(&mut *self.cx, "key")?;
         let value_obj = to_value(self.cx, value)?;
@@ -509,13 +509,13 @@ where
     type Error = Error;
 
     #[inline]
-    fn serialize_field<T: ?Sized>(
+    fn serialize_field<T>(
         &mut self,
         key: &'static str,
         value: &T,
     ) -> Result<(), Self::Error>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         let value = to_value(self.cx, value)?;
         self.object.set(self.cx, key, value)?;
@@ -556,13 +556,13 @@ where
     type Error = Error;
 
     #[inline]
-    fn serialize_field<T: ?Sized>(
+    fn serialize_field<T>(
         &mut self,
         key: &'static str,
         value: &T,
     ) -> Result<(), Self::Error>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         use serde::ser::SerializeStruct;
         self.inner.serialize_field(key, value)

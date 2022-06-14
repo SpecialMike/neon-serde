@@ -27,6 +27,12 @@ where
     Ok(t)
 }
 
+/// Deserialize an instance of type `T` from a `Option<Handle<JsValue>>`. Will return `JsUndefined` if `Option` is `None`.
+/// 
+/// # Errors
+/// 
+/// Can fail for various reasons see `ErrorKind`
+/// 
 pub fn from_value_opt<'j, C, T>(cx: &mut C, value: Option<Handle<'j, JsValue>>) -> LibResult<T>
 where
     C: Context<'j>,
@@ -65,7 +71,9 @@ impl<'x, 'd, 'a, 'j, C: Context<'j>> serde::de::Deserializer<'x> for &'d mut Des
             visitor.visit_string(val.value(self.cx))
         } else if let Ok(val) = self.input.downcast::<JsNumber, C>(self.cx) {
             let v = val.value(self.cx);
+            #[allow(clippy::float_cmp)]
             if v.trunc() == v {
+                #[allow(clippy::cast_possible_truncation)]
                 visitor.visit_i64(v as i64)
             } else {
                 visitor.visit_f64(v)
@@ -115,7 +123,7 @@ impl<'x, 'd, 'a, 'j, C: Context<'j>> serde::de::Deserializer<'x> for &'d mut Des
                 Err(LibError::InvalidKeyType(format!(
                     "object key with {} properties",
                     len
-                )))?
+                )))?;
             }
             let key = prop_names.get::<JsValue, _, _>(self.cx, 0)?.downcast::<JsString, C>(self.cx).or_throw(self.cx)?;
             let enum_value = val.get(self.cx, key)?;
@@ -209,7 +217,7 @@ struct JsObjectAccess<'a, 'j, C: Context<'j> + 'a> {
 }
 
 #[doc(hidden)]
-impl<'x, 'a, 'j, C: Context<'j>> JsObjectAccess<'a, 'j, C> {
+impl<'a, 'j, C: Context<'j>> JsObjectAccess<'a, 'j, C> {
     fn new(cx: &'a mut C, input: Handle<'j, JsObject>) -> LibResult<Self> {
         let prop_names = input.get_own_property_names(cx)?;
         let len = prop_names.len(cx);
