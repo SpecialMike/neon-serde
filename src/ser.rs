@@ -246,7 +246,7 @@ where
     fn serialize_newtype_variant<T>(
         self,
         _name: &'static str,
-        _variant_index: u32,
+        variant_index: u32,
         variant: &'static str,
         value: &T,
     ) -> Result<Self::Ok, Self::Error>
@@ -256,6 +256,9 @@ where
         let obj = JsObject::new(&mut *self.cx);
         let value_js = to_value(self.cx, value)?;
         obj.set(self.cx, variant, value_js)?;
+
+        let idx_js = to_value(self.cx, &variant_index)?;
+        obj.set(self.cx, "type", idx_js)?;
 
         Ok(obj.upcast())
     }
